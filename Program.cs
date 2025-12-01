@@ -4,7 +4,7 @@ using WebAppTest.Models;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Use SQLite
+// Use SQL Server (not SQLite based on your connection string name)
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseSqlServer(builder.Configuration.GetConnectionString("DefaultConnection")));
 
@@ -14,10 +14,25 @@ builder.Services.AddSwaggerGen();
 builder.Services.AddRazorPages();
 
 var app = builder.Build();
-// In Program.cs after builder.Build()
+
+// ✅ Apply migrations BEFORE checking/adding data
 using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    
+    // Apply pending migrations
+    try
+    {
+        db.Database.Migrate();
+        Console.WriteLine("Migrations applied successfully.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Error applying migrations: {ex.Message}");
+        // Don't re-throw to allow app to start, but log the error
+    }
+    
+    // Check and seed data only AFTER migrations are applied
     if (!db.Products.Any())
     {
         db.Products.AddRange(
@@ -25,6 +40,7 @@ using (var scope = app.Services.CreateScope())
             new Product { Name = "Mouse", Price = 25 }
         );
         db.SaveChanges();
+        Console.WriteLine("Sample data seeded.");
     }
 }
 
